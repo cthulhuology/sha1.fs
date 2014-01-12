@@ -45,31 +45,31 @@ create sha-state 5 cells allot
 
 : R0 ( v w x y z u -- ) 
 	to u to z to y to x to w to v
-	x @ y @ xor w @ and y @ xor u blk0 + 0x5A827999 + v @ 5 rol + z +!
+	x @ y @ xor w @ and y @ xor u blk0 + $5A827999 + v @ 5 rol + z +!
 	w @ 30 rol w !
 ;
 
 : R1 ( v w x y z u -- ) 
 	to u to z to y to x to w to v
-	x @ y @ xor w @ and y @ xor u blki + 0x5A827999 + v @ 5 rol + z +! 
+	x @ y @ xor w @ and y @ xor u blki + $5A827999 + v @ 5 rol + z +! 
 	w @ 30 rol w !
 ;
 
 : R2 ( v w x y z u -- ) 
 	to u to z to y to x to w to v
-	w x xor y xor u blki + 0x6ED9EBA1 + v @ 5 rol + z +!
+	w x xor y xor u blki + $6ED9EBA1 + v @ 5 rol + z +!
 	w @ 30 rol w !
 ;
 
 : R3 ( v w x y z u -- ) 
 	to u to z to y to x to w to v
-	w @ x @ or y @ and w @ x @ and or u blki + 0x8F1BBCDC + v @ 5 rol + z +!
+	w @ x @ or y @ and w @ x @ and or u blki + $8F1BBCDC + v @ 5 rol + z +!
 	w @ 30 rol w !
 ;
 
 : R4 ( v w x y z u -- ) 
 	to u to z to y to x to w to v
-	w @ x @ xor y @ xor u blki + 0xCA62C1D6 + v @ 5 rol + z +!
+	w @ x @ xor y @ xor u blki + $CA62C1D6 + v @ 5 rol + z +!
 	w @ 30 rol w !
 ;
 	
