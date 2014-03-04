@@ -7,9 +7,6 @@ A Portable SHA1 implementation in Forth
 Getting Started
 ---------------
 
-This code currenly only support messages of < 56 characters.  I need to do
-some additional work to add additional rounds of 512 bit bocks.
-
 To add to your gforth project
 
 	s" sha1.fs" included
