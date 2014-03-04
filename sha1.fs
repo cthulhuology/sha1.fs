@@ -31,21 +31,51 @@ sha-schedule 80 cells 0 fill
 	R> drop
 ;
 
-: sha-block-clear sha-block 64 0 fill ;
+false value onewritten
+false value overflows
 
-: sha-block-dump sha-block 64 dump ;
+0 value sha-source-addr
+0 value sha-source-length
+0 value sha-source-offset
+0 value sha-bit-length
 
-0 value len
-: sha-pad ( n < 56 -- )
-	to len
-	len 63 and 56 swap - 0 do
-		i 0= if $80 else 0 then
-		len i + sha-block + c!
-	loop 
-	len 3 lshift tobig64 sha-block 56 + !		\ len is in bits
-;
+: set-source ( a n -- ) 
+	dup to sha-source-length 8 * tobig64 to sha-bit-length 
+	to sha-source-addr 
+	0 to sha-source-offset 
+	false to onewritten ;
 
-: sha-string >R sha-block R@ cmove R> sha-pad ;	\ works assuming string is less than 56 characters
+: clear-sha-block sha-block 64 erase ;
+
+: dump-sha-block sha-block 64 dump ;
+
+: copy-to-sha-block ( a n -- n ) 64 min dup >R sha-block swap cmove> R> ;
+
+: write-one? ( n -- n+1 ) dup 64 < onewritten invert and if dup sha-block + $80 swap c! 1+ true to onewritten then ;
+
+: zero-fill? ( n -- n+m ) dup 56 < if negate 56 + dup sha-block + swap erase 56 then ;
+
+: over-fill? ( n -- n+m ) dup 56 > if dup sha-block + swap negate 64 + erase 64 true to overflows then ;
+
+: write-length? ( n -- n ) dup 56 = if sha-bit-length sha-block 56 + ! drop 64 false to overflows then ; 
+
+: update-offset ( n -- ) sha-source-offset + to sha-source-offset ;
+
+: fill-sha-block ( a n -- ) 
+	clear-sha-block copy-to-sha-block write-one? zero-fill? over-fill? write-length? update-offset ;
+
+: current-addr ( -- a ) sha-source-addr sha-source-offset + ;
+
+: current-length ( -- n ) sha-source-length sha-source-offset - ;
+
+: overran? sha-source-offset sha-source-length >= overflows and  ;
+: underran? sha-source-offset sha-source-length < ;
+
+\ next-page loads the next 64 bytes and handles any additional padding
+: next-page ( -- f )
+	overran? if current-addr 0 fill-sha-block false else
+	underran? if current-addr current-length fill-sha-block underran? overflows or else
+	false then then ;
 
 create sha-digest 5 cells allot
 : h0 sha-digest ;
@@ -54,13 +84,8 @@ create sha-digest 5 cells allot
 : h3 sha-digest 3 cells + ;
 : h4 sha-digest 4 cells + ;
 
-: sha-digest-init
-	$67452301 h0 !
-	$EFCDAB89 h1 !
-	$98BADCFE h2 !
-	$10325476 h3 !
-	$C3D2E1F0 h4 !
-;
+: sha-digest-init $67452301 h0 ! $EFCDAB89 h1 ! $98BADCFE h2 ! $10325476 h3 ! $C3D2E1F0 h4 ! ;
+
 \ immediately invoke to update so our later values are preseeded correctly
 sha-digest-init
 
@@ -156,14 +181,20 @@ h4 @ value e
 	dup 60 < if drop k2r else
 		drop k3r then then then ;
 
-: sha-hash
+
+: dump-abcde hex a . b . c . d . e . decimal cr	;
+: dump-h hex h0 ? h1 ? h2 ? h3 ? h4 ? decimal cr ;
+
+: prep-rounds
 	h0 @ to a
 	h1 @ to b
 	h2 @ to c
 	h3 @ to d
-	h4 @ to e
+	h4 @ to e ;
+	
+: hash-rounds
 	load-schedule
-	expand-schedule
+	expand-schedule 
 	\ cr hex a .  b . c . d . e . decimal cr
 	80 0 do
 		\ TEMP = S5(A) + ft(B,C,D) + E + Wt + Kt; 
@@ -172,15 +203,19 @@ h4 @ value e
 		\ E = D; D = C; C = S30(B); B = A; A = TEMP; 
 		d to e c to d b 30 bitrot to c a to b temp to a
 		\ hex I . a .  b . c . d . e . decimal cr
-	loop
-	h0 @ a + h0 !
-	h1 @ b + h1 !
-	h2 @ c + h2 !
-	h3 @ d + h3 !
-	h4 @ e + h4 !
-;
+	loop ;
 
-: sha1 ( a n -- ) sha-string sha-digest-init sha-hash ;
+: post-rounds
+	h0 @ a + $ffffffff and h0 !
+	h1 @ b + $ffffffff and h1 !
+	h2 @ c + $ffffffff and h2 !
+	h3 @ d + $ffffffff and h3 !
+	h4 @ e + $ffffffff and h4 ! 
+	;
+
+: sha1 ( a n -- ) 
+	set-source sha-digest-init 
+	begin prep-rounds next-page hash-rounds post-rounds while repeat ;
 
 : digest hex 
 	sha-digest l@ . 
@@ -189,5 +224,3 @@ h4 @ value e
 	sha-digest 3 cells + l@ .
 	sha-digest 4 cells + l@ .
 	decimal ;
-
-: test-sha1 s" abc" sha1 digest ." == A9993E36 4706816A BA3E2571 7850C26C 9CD0D89D " cr ;
